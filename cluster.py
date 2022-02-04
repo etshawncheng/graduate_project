@@ -8,21 +8,26 @@
 """ labeling tourist attractions"""
 import re
 from sys import stdout
-import jieba
-import numpy as np
 # ---------------------------------------------------------------------------
 # pandas, numpy, re for data processing, jieba for word segmenting, word2vec for data quantizing
+import jieba
+import numpy as np
 import pandas as pd
 from gensim.corpora import WikiCorpus
 from gensim.models import word2vec
 from sklearn import preprocessing
-
-traindata_path = 'zhwiki-latest-pages-articles.xml.bz2'
+#
 dictionary_path = r'C:/VS_Workplace/graduate_project/data/dict.txt.big.txt'
+#
 data_pathes = [r'C:/VS_Workplace/graduate_project/data/hualien.xlsx']
+#
 fileSegWordDonePath = r'C:/VS_Workplace/graduate_project/data/descriptionSegDone.txt'
+#
 modelPath = r'C:/VS_Workplace/graduate_project/data/descriptionSegDone.bin'
+#
 results_path = r'C:/VS_Workplace/graduate_project/data/results.txt'
+# stop word
+stopPath = r'C:/VS_Workplace/graduate_project/data/ChineseStopWords.txt'
 # seg
 
 
@@ -58,23 +63,41 @@ def coef(s: str = u"隨便") -> np.array:
 
 
 def sim():
+    stopwords = set()
+    with open(stopPath, "r+") as f:
+        for w in f.readlines():
+            stopwords.add(w.rstrip())
     model = load()
-    typ = [u'自然']
+
+    typ = [u'自然', u"戶外運動", u"藝文", u"風景名勝"]
     data = open(fileSegWordDonePath, 'r+')
     results = []
     for l in data.readlines():
         temp = []
-        l = re.sub(r"[^\u4e00-\uf9a5]", "", l)
         for t in typ:
             summary = 0
             length = 0
-            for w in l:
+            for w in l.rstrip().split():
+                w = re.sub(r"[^\u4e00-\uf9a5]", "", w)
+
+                if w in stopwords:
+                    continue
                 try:
                     score = model.wv.similarity(t, w)
-                    if score > 0.5:
+                    if score > 0.2:
                         summary += score
                         length += 1
                 except Exception as e:
+                    cut=jieba.cut(w, cut_all=True)
+                    for w in cut:
+                        try:
+                            score = model.wv.similarity(t, w)
+                            if score > 0.2:
+                                summary += score
+                                length += 1
+                        except:
+                            stdout.write(f"{w}: {str(e)}\n")
+                            continue
                     stdout.write(f"{w}: {str(e)}\n")
                     continue
             avg = summary/length if length != 0 else (0., 0)
@@ -97,13 +120,16 @@ def printFile(path: str):
 
 if __name__ == '__main__':
     # seg()
-    model=load()
+    model = load()
+    # model.wv.get_vector()
     # train()
     # sim()
     # printFile(results_path)
-    with open(fileSegWordDonePath, "r+") as f:
-        for w in f.readline().rstrip().split():
-            try:
-                stdout.write(f'{w}: {model.wv.similarity(u"自然", w)}\n')
-            except KeyError:
-                stdout.write(f'{w}: no key, {0.}\n')
+    # with open(fileSegWordDonePath, "r+") as f:
+    #     for w in f.readline().rstrip().split():
+    #         try:
+    #             stdout.write(f'{w}: {model.wv.similarity(u"自然", w)}\n')
+    #         except KeyError:
+    #             stdout.write(f'{w}: no key, {0.}\n')
+    for i in model.wv.most_similar("廖",topn = 100):
+        print(i)
